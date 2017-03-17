@@ -12,29 +12,29 @@ import (
 	"github.com/pkg/errors"
 )
 
-func New(env vos.Env) (*Builder, error) {
-	b := &Builder{
-		env: env,
-	}
+func New(env vos.Env, namespace string) (*Builder, error) {
+
 	gopath, err := ioutil.TempDir("", "go")
 	if err != nil {
 		return nil, errors.Wrap(err, "Error creating temporary gopath root dir")
 	}
-	b.root = gopath
+
+	b := &Builder{
+		env:       env,
+		root:      gopath,
+		namespace: namespace,
+	}
+
 	if err := os.Mkdir(filepath.Join(gopath, "src"), os.FileMode(0777)); err != nil {
 		b.Cleanup()
 		return nil, errors.Wrap(err, "Error creating temporary gopath src dir")
 	}
 	b.env.Setenv("GOPATH", gopath+string(filepath.ListSeparator)+b.env.Getenv("GOPATH"))
 
-	dir, err := ioutil.TempDir(filepath.Join(gopath, "src"), "ns")
-	if err != nil {
+	if err := os.MkdirAll(filepath.Join(gopath, "src", namespace), os.FileMode(0777)); err != nil {
 		b.Cleanup()
 		return nil, errors.Wrap(err, "Error creating temporary namespace dir")
 	}
-
-	// namespace is of the form <gopath>/src/<namespace>
-	b.namespace = dir[strings.LastIndex(dir, string(os.PathSeparator))+1:]
 
 	return b, nil
 }
