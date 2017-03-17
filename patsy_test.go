@@ -1,9 +1,13 @@
-package patsy
+package patsy_test
 
 import (
 	"path/filepath"
 	"testing"
 
+	"strings"
+
+	"github.com/dave/patsy"
+	"github.com/dave/patsy/builder"
 	"github.com/dave/patsy/vos"
 )
 
@@ -12,76 +16,136 @@ func TestGetCurrentGopath(t *testing.T) {
 	abc := filepath.Join("a", "b", "c")
 	def := filepath.Join("d", "e", "f")
 	env.Setenv("GOPATH", abc+string(filepath.ListSeparator)+def)
-	gop := GetCurrentGopath(env)
+	gop := patsy.GetCurrentGopath(env)
 
 	if gop != abc {
 		t.Fatalf("Expected %s", abc)
 	}
 	env.Setwd(filepath.Join("d", "e", "f", "g", "h"))
 
-	gop = GetCurrentGopath(env)
+	gop = patsy.GetCurrentGopath(env)
 	if gop != def {
 		t.Fatalf("Expected %s", def)
 	}
 }
 
-/*
 func TestGetPackageFromDir(t *testing.T) {
 
-	cb := tests.New().TempGopath(false)
-	defer cb.Cleanup()
-	packagePath, packageDir := cb.TempPackage("a", map[string]string{})
+	env := vos.Mock()
+	b, err := builder.New(env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer b.Cleanup()
 
-	calculatedPath, err := GetPackageFromDir(cb.Ctx(), packageDir)
-	require.NoError(t, err)
-	assert.Equal(t, packagePath, calculatedPath)
+	packagePath, packageDir, err := b.Package("a", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	vos := vosctx.FromContext(cb.Ctx())
-	cb.OsVar("GOPATH", "/fdskljsfdash/"+string(filepath.ListSeparator)+vos.Getenv("GOPATH"))
+	calculatedPath, err := patsy.GetPackageFromDir(env, packageDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calculatedPath != packagePath {
+		t.Fatalf("Got %s, Expected %s", calculatedPath, packagePath)
+	}
 
-	calculatedPath, err = GetPackageFromDir(cb.Ctx(), packageDir)
-	require.NoError(t, err)
-	assert.Equal(t, packagePath, calculatedPath)
+	env.Setenv("GOPATH", "/foo/"+string(filepath.ListSeparator)+env.Getenv("GOPATH"))
 
-	cb.OsVar("GOPATH", "/fdskljsfdash/")
-	_, err = GetPackageFromDir(cb.Ctx(), packageDir)
-	assert.IsError(t, err, "CXOETFPTGM")
+	calculatedPath, err = patsy.GetPackageFromDir(env, packageDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calculatedPath != packagePath {
+		t.Fatalf("Got %s, Expected %s", calculatedPath, packagePath)
+	}
+
+	env.Setenv("GOPATH", "/bar/")
+	_, err = patsy.GetPackageFromDir(env, packageDir)
+	if err == nil {
+		t.Fatal("Expected error, got none.")
+	} else if !strings.HasPrefix(err.Error(), "Package not found") {
+		t.Fatalf("Expected 'Package not found', got '%s'", err.Error())
+	}
 }
-/*
+
 func TestGetDirFromEmptyPackage(t *testing.T) {
-	cb := tests.New().TempGopath(false)
-	defer cb.Cleanup()
-	packagePath, packageDir := cb.TempPackage("a", map[string]string{})
 
-	_, err := GetDirFromEmptyPackage(cb.Ctx(), "a.b/c")
-	assert.IsError(t, err, "SUTCWEVRXS")
+	env := vos.Mock()
+	b, err := builder.New(env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer b.Cleanup()
 
-	calculatedDir, err := GetDirFromEmptyPackage(cb.Ctx(), packagePath)
-	require.NoError(t, err)
-	assert.Equal(t, packageDir, calculatedDir)
+	packagePath, packageDir, err := b.Package("a", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	vos := vosctx.FromContext(cb.Ctx())
-	cb.OsVar("GOPATH", "/fdskljsfdash/"+string(filepath.ListSeparator)+vos.Getenv("GOPATH"))
+	_, err = patsy.GetPackageFromDir(env, "/foo")
+	if err == nil {
+		t.Fatal("Expected error, got none.")
+	} else if !strings.HasPrefix(err.Error(), "Package not found for /foo") {
+		t.Fatalf("Expected 'Package not found for /foo', got '%s'", err.Error())
+	}
+
+	calculatedDir, err := patsy.GetDirFromEmptyPackage(env, packagePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calculatedDir != packageDir {
+		t.Fatalf("Got %s, expected %s", calculatedDir, packageDir)
+	}
+
+	env.Setenv("GOPATH", "/foo/"+string(filepath.ListSeparator)+env.Getenv("GOPATH"))
 
 	// This will now need two loops around to get the package
-	calculatedDir, err = GetDirFromEmptyPackage(cb.Ctx(), packagePath)
-	require.NoError(t, err)
-	assert.Equal(t, packageDir, calculatedDir)
+	calculatedDir, err = patsy.GetDirFromEmptyPackage(env, packagePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calculatedDir != packageDir {
+		t.Fatalf("Got %s, expected %s", calculatedDir, packageDir)
+	}
 
 }
+
 func TestGetDirFromPackage(t *testing.T) {
-	cb := tests.New().TempGopath(false)
-	defer cb.Cleanup()
-	packagePath, packageDir := cb.TempPackage("a", map[string]string{})
-	calculatedDir, err := GetDirFromPackage(cb.Ctx(), packagePath)
-	require.NoError(t, err)
-	assert.Equal(t, packageDir, calculatedDir)
 
-	cb.TempFile("a.go", "package a")
+	env := vos.Mock()
+	b, err := builder.New(env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer b.Cleanup()
 
-	calculatedDir, err = GetDirFromPackage(cb.Ctx(), packagePath)
-	require.NoError(t, err)
-	assert.Equal(t, packageDir, calculatedDir)
+	packagePath, packageDir, err := b.Package("a", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	calculatedDir, err := patsy.GetDirFromPackage(env, packagePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calculatedDir != packageDir {
+		t.Fatalf("Got %s, expected %s", calculatedDir, packageDir)
+	}
+
+	err = b.File("a", "a.go", "package a")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// TODO: somehow ensure exe.CombinedOutput() succeeds?
+	calculatedDir, err = patsy.GetDirFromPackage(env, packagePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calculatedDir != packageDir {
+		t.Fatalf("Got %s, expected %s", calculatedDir, packageDir)
+	}
 
 }
-*/

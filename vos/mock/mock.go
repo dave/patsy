@@ -21,7 +21,11 @@ func (m *Env) Getenv(key string) string {
 	if m.EnvironmentVariables == nil {
 		return os.Getenv(key)
 	}
-	return m.EnvironmentVariables[key]
+	e, ok := m.EnvironmentVariables[key]
+	if !ok {
+		return os.Getenv(key)
+	}
+	return e
 }
 
 func (m *Env) Setenv(key, value string) error {

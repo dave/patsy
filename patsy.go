@@ -1,7 +1,6 @@
 package patsy
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -39,28 +38,16 @@ func GetDirFromEmptyPackage(env vos.Env, packagePath string) (string, error) {
 }
 
 func GetPackageFromDir(env vos.Env, packageDir string) (string, error) {
-	var err error
+	packageDir = filepath.Clean(packageDir)
 	for _, gopath := range filepath.SplitList(env.Getenv("GOPATH")) {
 		if strings.HasPrefix(packageDir, gopath) {
-			src := fmt.Sprintf("%s/src", gopath)
-			rel, inner := filepath.Rel(src, packageDir)
-			if inner != nil {
-				// I don't think we can trigger this error if dir starts with
-				// gopath
-				err = inner
-				continue
+			rel, inner := filepath.Rel(filepath.Join(gopath, "src"), packageDir)
+			if inner == nil && rel != "" {
+				// Remember we're returning a package path, which uses forward
+				// slashes even on windows
+				return filepath.ToSlash(rel), nil
 			}
-			if rel == "" {
-				// I don't think we can trigger this either
-				continue
-			}
-			// Remember we're returning a package path, which uses forward
-			// slashes even on windows
-			return filepath.ToSlash(rel), nil
 		}
-	}
-	if err != nil {
-		return "", err
 	}
 	return "", errors.Errorf("Package not found for %s", packageDir)
 }
