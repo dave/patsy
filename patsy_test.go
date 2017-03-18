@@ -6,9 +6,9 @@ import (
 
 	"strings"
 
-	"github.com/dave/patsy"
 	"github.com/dave/patsy/builder"
 	"github.com/dave/patsy/vos"
+	"github.com/dave/patsy"
 )
 
 func TestGetCurrentGopath(t *testing.T) {
@@ -32,7 +32,7 @@ func TestGetCurrentGopath(t *testing.T) {
 func TestGetPackageFromDir(t *testing.T) {
 
 	env := vos.Mock()
-	b, err := builder.New(env)
+	b, err := builder.New(env, "ns")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +73,7 @@ func TestGetPackageFromDir(t *testing.T) {
 func TestGetDirFromEmptyPackage(t *testing.T) {
 
 	env := vos.Mock()
-	b, err := builder.New(env)
+	b, err := builder.New(env, "ns")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +115,7 @@ func TestGetDirFromEmptyPackage(t *testing.T) {
 func TestGetDirFromPackage(t *testing.T) {
 
 	env := vos.Mock()
-	b, err := builder.New(env)
+	b, err := builder.New(env, "ns")
 	if err != nil {
 		t.Fatal(err)
 	}
