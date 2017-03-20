@@ -5,13 +5,10 @@
 Patsy is a package helper for Go.
 
 # Dir
-Dir returns the filesystem path for the directory corresponding to the go
-package path provided.
+{{ "Dir" | doc }}
 
 # Path
-Path returns the go package path corresponding to the filesystem directory
-provided.
+{{ "Path" | doc }}
 
 # Cache
-NewCache returns a new *Cache, allowing cached access to patsy utility
-functions.
+{{ "NewCache" | doc }}

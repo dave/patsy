@@ -1,6 +1,9 @@
-// package patsy is a package helper utility. It allows the coonversion of go
+// package patsy is a package helper utility. It allows the conversion of go
 // package paths to filesystem directories and vice versa.
 package patsy
+
+//go:generate go get github.com/dave/rebecca/cmd/becca
+//go:generate becca -package=github.com/dave/patsy
 
 import (
 	"os"
@@ -12,6 +15,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Dir returns the filesystem path for the directory corresponding to the go
+// package path provided.
 func Dir(env vos.Env, packagePath string) (string, error) {
 
 	exe := exec.Command("go", "list", "-f", "{{.Dir}}", packagePath)
@@ -36,6 +41,8 @@ func Dir(env vos.Env, packagePath string) (string, error) {
 
 }
 
+// Path returns the go package path corresponding to the filesystem directory
+// provided.
 func Path(env vos.Env, packageDir string) (string, error) {
 	packageDir = filepath.Clean(packageDir)
 	for _, gopath := range filepath.SplitList(env.Getenv("GOPATH")) {
