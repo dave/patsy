@@ -1,3 +1,5 @@
+// package builder can be used in testing to create a temporary gopath, src, 
+// namespace and package directory, and populate it with source files.
 package builder
 
 import (
@@ -12,6 +14,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+// New creates a new gopath in the system temporary location, creates the src
+// dir and the namespace dir. The gopath is appended to the beginning of the 
+// existing gopath, so existing imports will still work. Remember to defer the 
+// Cleanup() method to delete the temporary files.
 func New(env vos.Env, namespace string) (*Builder, error) {
 
 	gopath, err := ioutil.TempDir("", "go")
@@ -39,12 +45,15 @@ func New(env vos.Env, namespace string) (*Builder, error) {
 	return b, nil
 }
 
+// Builder can be used in testing to create a temporary gopath, src, namespace 
+// and package directory, and populate it with source files.
 type Builder struct {
 	env       vos.Env // mockable environment
 	root      string  // temporary gopath root dir
 	namespace string  // temporary namespace
 }
 
+// File creates a new source file in the package.
 func (b *Builder) File(packageName, filename, contents string) error {
 	dir := filepath.Join(b.root, "src", b.namespace, packageName)
 	if strings.HasSuffix(filename, ".yaml") || strings.HasSuffix(filename, ".yml") {
@@ -58,6 +67,7 @@ func (b *Builder) File(packageName, filename, contents string) error {
 	return nil
 }
 
+// Package creates a new package and populates with source files.
 func (b *Builder) Package(packageName string, files map[string]string) (packagePath string, packageDir string, err error) {
 
 	dir := filepath.Join(b.root, "src", b.namespace, packageName)
@@ -76,6 +86,7 @@ func (b *Builder) Package(packageName string, files map[string]string) (packageP
 	return path.Join(b.namespace, packageName), dir, nil
 }
 
+// Cleanup deletes all temporary files.
 func (b *Builder) Cleanup() {
 	os.RemoveAll(b.root)
 }

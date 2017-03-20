@@ -1,3 +1,5 @@
+// package patsy is a package helper utility. It allows the coonversion of go
+// package paths to filesystem directories and vice versa.
 package patsy
 
 import (
@@ -10,7 +12,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func GetDirFromPackage(env vos.Env, packagePath string) (string, error) {
+func Dir(env vos.Env, packagePath string) (string, error) {
 
 	exe := exec.Command("go", "list", "-f", "{{.Dir}}", packagePath)
 	exe.Env = env.Environ()
@@ -19,25 +21,22 @@ func GetDirFromPackage(env vos.Env, packagePath string) (string, error) {
 		return strings.TrimSpace(string(out)), nil
 	}
 
-	dir, err := GetDirFromEmptyPackage(env, packagePath)
-	if err != nil {
-		return "", err
-	}
-	return dir, nil
-
-}
-
-func GetDirFromEmptyPackage(env vos.Env, packagePath string) (string, error) {
+	// The go list command will throw an error if the package directory is
+	// empty. In this case we need to explore the filesystem to see if there is
+	// a directory in <gopath>/src/<package-path>. Remember there can be
+	// several gopaths. We return the first matching directory.
 	for _, gopath := range filepath.SplitList(env.Getenv("GOPATH")) {
 		dir := filepath.Join(gopath, "src", packagePath)
 		if s, err := os.Stat(dir); err == nil && s.IsDir() {
 			return dir, nil
 		}
 	}
-	return "", errors.Errorf("%s not found", packagePath)
+
+	return "", errors.Errorf("Dir not found for %s", packagePath)
+
 }
 
-func GetPackageFromDir(env vos.Env, packageDir string) (string, error) {
+func Path(env vos.Env, packageDir string) (string, error) {
 	packageDir = filepath.Clean(packageDir)
 	for _, gopath := range filepath.SplitList(env.Getenv("GOPATH")) {
 		if strings.HasPrefix(packageDir, gopath) {
@@ -50,19 +49,4 @@ func GetPackageFromDir(env vos.Env, packageDir string) (string, error) {
 		}
 	}
 	return "", errors.Errorf("Package not found for %s", packageDir)
-}
-
-func GetCurrentGopath(env vos.Env) string {
-	gopaths := filepath.SplitList(env.Getenv("GOPATH"))
-	currentDir, err := env.Getwd()
-	if err != nil {
-		// can't find the current working dir
-		return gopaths[0]
-	}
-	for _, gopath := range gopaths {
-		if strings.HasPrefix(currentDir, gopath) {
-			return gopath
-		}
-	}
-	return gopaths[0]
 }

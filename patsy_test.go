@@ -11,24 +11,6 @@ import (
 	"github.com/dave/patsy"
 )
 
-func TestGetCurrentGopath(t *testing.T) {
-	env := vos.Mock()
-	abc := filepath.Join("a", "b", "c")
-	def := filepath.Join("d", "e", "f")
-	env.Setenv("GOPATH", abc+string(filepath.ListSeparator)+def)
-	gop := patsy.GetCurrentGopath(env)
-
-	if gop != abc {
-		t.Fatalf("Expected %s", abc)
-	}
-	env.Setwd(filepath.Join("d", "e", "f", "g", "h"))
-
-	gop = patsy.GetCurrentGopath(env)
-	if gop != def {
-		t.Fatalf("Expected %s", def)
-	}
-}
-
 func TestGetPackageFromDir(t *testing.T) {
 
 	env := vos.Mock()
@@ -43,7 +25,7 @@ func TestGetPackageFromDir(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	calculatedPath, err := patsy.GetPackageFromDir(env, packageDir)
+	calculatedPath, err := patsy.Path(env, packageDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +35,7 @@ func TestGetPackageFromDir(t *testing.T) {
 
 	env.Setenv("GOPATH", "/foo/"+string(filepath.ListSeparator)+env.Getenv("GOPATH"))
 
-	calculatedPath, err = patsy.GetPackageFromDir(env, packageDir)
+	calculatedPath, err = patsy.Path(env, packageDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,54 +44,12 @@ func TestGetPackageFromDir(t *testing.T) {
 	}
 
 	env.Setenv("GOPATH", "/bar/")
-	_, err = patsy.GetPackageFromDir(env, packageDir)
+	_, err = patsy.Path(env, packageDir)
 	if err == nil {
 		t.Fatal("Expected error, got none.")
 	} else if !strings.HasPrefix(err.Error(), "Package not found") {
 		t.Fatalf("Expected 'Package not found', got '%s'", err.Error())
 	}
-}
-
-func TestGetDirFromEmptyPackage(t *testing.T) {
-
-	env := vos.Mock()
-	b, err := builder.New(env, "ns")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer b.Cleanup()
-
-	packagePath, packageDir, err := b.Package("a", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = patsy.GetPackageFromDir(env, "/foo")
-	if err == nil {
-		t.Fatal("Expected error, got none.")
-	} else if !strings.HasPrefix(err.Error(), "Package not found for /foo") {
-		t.Fatalf("Expected 'Package not found for /foo', got '%s'", err.Error())
-	}
-
-	calculatedDir, err := patsy.GetDirFromEmptyPackage(env, packagePath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if calculatedDir != packageDir {
-		t.Fatalf("Got %s, expected %s", calculatedDir, packageDir)
-	}
-
-	env.Setenv("GOPATH", "/foo/"+string(filepath.ListSeparator)+env.Getenv("GOPATH"))
-
-	// This will now need two loops around to get the package
-	calculatedDir, err = patsy.GetDirFromEmptyPackage(env, packagePath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if calculatedDir != packageDir {
-		t.Fatalf("Got %s, expected %s", calculatedDir, packageDir)
-	}
-
 }
 
 func TestGetDirFromPackage(t *testing.T) {
@@ -126,7 +66,7 @@ func TestGetDirFromPackage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	calculatedDir, err := patsy.GetDirFromPackage(env, packagePath)
+	calculatedDir, err := patsy.Dir(env, packagePath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,7 +80,7 @@ func TestGetDirFromPackage(t *testing.T) {
 	}
 
 	// TODO: somehow ensure exe.CombinedOutput() succeeds?
-	calculatedDir, err = patsy.GetDirFromPackage(env, packagePath)
+	calculatedDir, err = patsy.Dir(env, packagePath)
 	if err != nil {
 		t.Fatal(err)
 	}
