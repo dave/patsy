@@ -3,6 +3,8 @@
 package vos
 
 import (
+	"io"
+
 	"github.com/dave/patsy/vos/mock"
 	"github.com/dave/patsy/vos/os"
 )
@@ -11,10 +13,18 @@ import (
 // os.Getwd functions.
 type Env interface {
 	Environ() []string
+
 	Getenv(key string) string
-	Setenv(key, value string) error
 	Getwd() (string, error)
+	Stdout() io.Writer
+	Stderr() io.Writer
+	Stdin() io.Reader
+
+	Setenv(key, value string) error
 	Setwd(dir string) error
+	Setstdout(io.Writer)
+	Setstderr(io.Writer)
+	Setstdin(io.Reader)
 }
 
 var _ Env = (*os.Env)(nil)

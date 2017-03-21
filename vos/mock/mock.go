@@ -2,6 +2,7 @@ package mock
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"sync"
@@ -15,9 +16,45 @@ func New() *Env {
 }
 
 type Env struct {
-	varsm *sync.RWMutex
-	vars  map[string]string
-	wd    string
+	varsm  *sync.RWMutex
+	vars   map[string]string
+	wd     string
+	stdout io.Writer
+	stderr io.Writer
+	stdin  io.Reader
+}
+
+func (e *Env) Stdout() io.Writer {
+	if e.stdout != nil {
+		return e.stdout
+	}
+	return os.Stdout
+}
+
+func (e *Env) Setstdout(w io.Writer) {
+	e.stdout = w
+}
+
+func (e *Env) Stderr() io.Writer {
+	if e.stderr != nil {
+		return e.stderr
+	}
+	return os.Stderr
+}
+
+func (e *Env) Setstderr(w io.Writer) {
+	e.stderr = w
+}
+
+func (e *Env) Stdin() io.Reader {
+	if e.stdin != nil {
+		return e.stdin
+	}
+	return os.Stdin
+}
+
+func (e *Env) Setstdin(r io.Reader) {
+	e.stdin = r
 }
 
 func (e *Env) Getenv(key string) string {
