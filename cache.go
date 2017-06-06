@@ -16,9 +16,16 @@ func NewCache(env vos.Env) *Cache {
 		env:    env,
 		dirsm:  new(sync.RWMutex),
 		pathsm: new(sync.RWMutex),
+		namesm: new(sync.RWMutex),
 		dirs:   make(map[string]string),
 		paths:  make(map[string]string),
+		names:  make(map[namekey]string),
 	}
+}
+
+type namekey struct {
+	path string
+	dir  string
 }
 
 // Cache supports patsy.Dir and patsy.Path, but cached so they can be used in
@@ -27,8 +34,24 @@ type Cache struct {
 	env    vos.Env
 	dirsm  *sync.RWMutex
 	pathsm *sync.RWMutex
+	namesm *sync.RWMutex
 	dirs   map[string]string
 	paths  map[string]string
+	names  map[namekey]string
+}
+
+// Name does the same as patsy.Name but cached.
+func (c *Cache) Name(packagePath, srcDir string) (string, error) {
+	// check the cache first
+	if n, ok := c.getName(namekey{path: packagePath, dir: srcDir}); ok {
+		return n, nil
+	}
+	n, err := Name(c.env, packagePath, srcDir)
+	if err != nil {
+		return "", err
+	}
+	c.setName(namekey{path: packagePath, dir: srcDir}, n)
+	return n, nil
 }
 
 // Path does the same as patsy.Path but cached.
@@ -97,6 +120,13 @@ func (c *Cache) getPath(key string) (string, bool) {
 	return v, ok
 }
 
+func (c *Cache) getName(key namekey) (string, bool) {
+	c.namesm.RLock()
+	defer c.namesm.RUnlock()
+	v, ok := c.names[key]
+	return v, ok
+}
+
 func (c *Cache) setDir(key, value string) {
 	c.dirsm.Lock()
 	defer c.dirsm.Unlock()
@@ -107,4 +137,10 @@ func (c *Cache) setPath(key, value string) {
 	c.pathsm.Lock()
 	defer c.pathsm.Unlock()
 	c.paths[key] = value
+}
+
+func (c *Cache) setName(key namekey, value string) {
+	c.namesm.Lock()
+	defer c.namesm.Unlock()
+	c.names[key] = value
 }

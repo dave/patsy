@@ -6,6 +6,7 @@ package patsy
 //go:generate becca -package=github.com/dave/patsy
 
 import (
+	"go/build"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,6 +15,19 @@ import (
 	"github.com/dave/patsy/vos"
 	"github.com/pkg/errors"
 )
+
+// Name returns the package name for a given path and src dir. Note that
+// the src dir (e.g. working dir) is required because multiple vendored
+// packages can correspond to the same path when accessed from different dirs.
+func Name(env vos.Env, packagePath string, srcDir string) (string, error) {
+	c := build.Default
+	c.GOPATH = env.Getenv("GOPATH")
+	p, err := c.Import(packagePath, srcDir, 0)
+	if err != nil {
+		return "", errors.Wrapf(err, "importing %s", packagePath)
+	}
+	return p.Name, nil
+}
 
 // Dir returns the filesystem path for the directory corresponding to the go
 // package path provided.
