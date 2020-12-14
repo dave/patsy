@@ -22,6 +22,13 @@ import (
 func Name(env vos.Env, packagePath string, srcDir string) (string, error) {
 	c := build.Default
 	c.GOPATH = env.Getenv("GOPATH")
+
+	// change dir to the srcDir because go/build uses os.Getwd when go modules is enabled
+	err := os.Chdir(srcDir)
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
+
 	p, err := c.Import(packagePath, srcDir, 0)
 	if err != nil {
 		return "", errors.Wrapf(err, "importing %s", packagePath)
@@ -32,42 +39,101 @@ func Name(env vos.Env, packagePath string, srcDir string) (string, error) {
 // Dir returns the filesystem path for the directory corresponding to the go
 // package path provided.
 func Dir(env vos.Env, packagePath string) (string, error) {
-
-	exe := exec.Command("go", "list", "-f", "{{.Dir}}", packagePath)
-	exe.Env = env.Environ()
-	out, err := exe.CombinedOutput()
+	// use Dirs internally to find the directory
+	dirs, err := Dirs(env, packagePath)
 	if err == nil {
-		return strings.TrimSpace(string(out)), nil
+		dir, ok := dirs[packagePath]
+		if ok {
+			return dir, nil
+		}
 	}
 
 	// The go list command will throw an error if the package directory is
 	// empty. In this case we need to explore the filesystem to see if there is
 	// a directory in <gopath>/src/<package-path>. Remember there can be
 	// several gopaths. We return the first matching directory.
-	for _, gopath := range filepath.SplitList(env.Getenv("GOPATH")) {
-		dir := filepath.Join(gopath, "src", packagePath)
-		if s, err := os.Stat(dir); err == nil && s.IsDir() {
-			return dir, nil
+	if env.Getenv("GOPATH") != "" {
+		for _, gopath := range filepath.SplitList(env.Getenv("GOPATH")) {
+			dir := filepath.Join(gopath, "src", packagePath)
+			if s, err := os.Stat(dir); err == nil && s.IsDir() {
+				return dir, nil
+			}
 		}
 	}
 
 	return "", errors.Errorf("Dir not found for %s", packagePath)
+}
 
+// Dirs returns the filesystem path for all packages under the directory corresponding to the go
+// package path provided.
+func Dirs(env vos.Env, packagePath string) (map[string]string, error) {
+	wd, err := env.Getwd()
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	exe := exec.Command("go", "list", "-f", "{{.ImportPath}}:{{.Dir}}", packagePath)
+	exe.Dir = wd
+	exe.Env = env.Environ()
+	out, err := exe.CombinedOutput()
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	lines := strings.Split(string(out), "\n")
+
+	result := make(map[string]string, len(lines))
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "go: warning:") {
+			continue
+		}
+
+		chunks := strings.Split(strings.TrimSpace(line), ":")
+		importPath := chunks[0]
+		dir := chunks[1]
+
+		result[importPath] = dir
+	}
+
+	return result, nil
 }
 
 // Path returns the go package path corresponding to the filesystem directory
 // provided.
 func Path(env vos.Env, packageDir string) (string, error) {
-	packageDir = filepath.Clean(packageDir)
-	for _, gopath := range filepath.SplitList(env.Getenv("GOPATH")) {
-		if strings.HasPrefix(packageDir, gopath) {
-			rel, inner := filepath.Rel(filepath.Join(gopath, "src"), packageDir)
-			if inner == nil && rel != "" {
-				// Remember we're returning a package path, which uses forward
-				// slashes even on windows
-				return filepath.ToSlash(rel), nil
+	// packageDir needs to match what `go list` will be returning, so eval symlinks and clean
+	packageDir, err := filepath.EvalSymlinks(filepath.Clean(packageDir))
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
+
+	// use Dirs internally
+	dirs, err := Dirs(env, packageDir)
+	if err == nil {
+		for ppath, dir := range dirs {
+			if dir == packageDir {
+				return ppath, nil
 			}
 		}
 	}
+
+	// The go list command will throw an error if the package directory is
+	// empty. In this case we need to explore the filesystem to see if there is
+	// a directory in <gopath>/src/<package-path>. Remember there can be
+	// several gopaths. We return the first matching directory.
+	if env.Getenv("GOPATH") != "" {
+		for _, gopath := range filepath.SplitList(env.Getenv("GOPATH")) {
+			if strings.HasPrefix(packageDir, gopath) {
+				rel, inner := filepath.Rel(filepath.Join(gopath, "src"), packageDir)
+				if inner == nil && rel != "" {
+					// Remember we're returning a package path, which uses forward
+					// slashes even on windows
+					return filepath.ToSlash(rel), nil
+				}
+			}
+		}
+	}
+
 	return "", errors.Errorf("Package not found for %s", packageDir)
 }
