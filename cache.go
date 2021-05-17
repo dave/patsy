@@ -4,7 +4,6 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
-
 	"sync"
 
 	"github.com/dave/patsy/vos"
@@ -20,15 +19,16 @@ func NewCache(env vos.Env) *Cache {
 		dirsm:     new(sync.RWMutex),
 		pathm:     new(sync.RWMutex),
 		namem:     new(sync.RWMutex),
-		dirCache:  make(map[string]string),
-		dirsCache: make(map[string]map[string]string),
-		pathCache: make(map[string]string),
-		nameCache: make(map[namekey]string),
+		dirCache:  make(map[keyWithDir]string),
+		dirsCache: make(map[keyWithDir]map[string]string),
+		pathCache: make(map[keyWithDir]string),
+		nameCache: make(map[keyWithDir]string),
 	}
 }
 
-type namekey struct {
-	path string
+// depending on the cwdir results can vary, so we include the directory in the cache keys
+type keyWithDir struct {
+	key string
 	dir  string
 }
 
@@ -40,23 +40,23 @@ type Cache struct {
 	dirsm     *sync.RWMutex
 	pathm     *sync.RWMutex
 	namem     *sync.RWMutex
-	dirCache  map[string]string
-	dirsCache map[string]map[string]string
-	pathCache map[string]string
-	nameCache map[namekey]string
+	dirCache  map[keyWithDir]string
+	dirsCache map[keyWithDir]map[string]string
+	pathCache map[keyWithDir]string
+	nameCache map[keyWithDir]string
 }
 
 // Name does the same as patsy.Name but cached.
 func (c *Cache) Name(packagePath, srcDir string) (string, error) {
 	// check the cache first
-	if n, ok := c.getName(namekey{path: packagePath, dir: srcDir}); ok {
+	if n, ok := c.getName(keyWithDir{key: packagePath, dir: srcDir}); ok {
 		return n, nil
 	}
 	n, err := Name(c.env, packagePath, srcDir)
 	if err != nil {
 		return "", err
 	}
-	c.setName(namekey{path: packagePath, dir: srcDir}, n)
+	c.setName(keyWithDir{key: packagePath, dir: srcDir}, n)
 	return n, nil
 }
 
@@ -143,25 +143,28 @@ func (c *Cache) FilePath(gpath string) (string, error) {
 func (c *Cache) getDir(key string) (string, bool) {
 	c.dirm.RLock()
 	defer c.dirm.RUnlock()
-	v, ok := c.dirCache[key]
+	wd, _ := c.env.Getwd()
+	v, ok := c.dirCache[keyWithDir{key: wd, dir: key}]
 	return v, ok
 }
 
 func (c *Cache) getDirs(key string) (map[string]string, bool) {
 	c.dirsm.RLock()
 	defer c.dirsm.RUnlock()
-	v, ok := c.dirsCache[key]
+	wd, _ := c.env.Getwd()
+	v, ok := c.dirsCache[keyWithDir{dir: wd, key: key}]
 	return v, ok
 }
 
 func (c *Cache) getPath(key string) (string, bool) {
 	c.pathm.RLock()
 	defer c.pathm.RUnlock()
-	v, ok := c.pathCache[key]
+	wd, _ := c.env.Getwd()
+	v, ok := c.pathCache[keyWithDir{dir: wd, key: key}]
 	return v, ok
 }
 
-func (c *Cache) getName(key namekey) (string, bool) {
+func (c *Cache) getName(key keyWithDir) (string, bool) {
 	c.namem.RLock()
 	defer c.namem.RUnlock()
 	v, ok := c.nameCache[key]
@@ -171,22 +174,25 @@ func (c *Cache) getName(key namekey) (string, bool) {
 func (c *Cache) setDir(key, value string) {
 	c.dirm.Lock()
 	defer c.dirm.Unlock()
-	c.dirCache[key] = value
+	wd, _ := c.env.Getwd()
+	c.dirCache[keyWithDir{dir: wd, key: key}] = value
 }
 
 func (c *Cache) setDirs(key string, value map[string]string) {
 	c.dirsm.Lock()
 	defer c.dirsm.Unlock()
-	c.dirsCache[key] = value
+	wd, _ := c.env.Getwd()
+	c.dirsCache[keyWithDir{dir: wd, key: key}] = value
 }
 
 func (c *Cache) setPath(key, value string) {
 	c.pathm.Lock()
 	defer c.pathm.Unlock()
-	c.pathCache[key] = value
+	wd, _ := c.env.Getwd()
+	c.pathCache[keyWithDir{dir: wd, key: key}] = value
 }
 
-func (c *Cache) setName(key namekey, value string) {
+func (c *Cache) setName(key keyWithDir, value string) {
 	c.namem.Lock()
 	defer c.namem.Unlock()
 	c.nameCache[key] = value
