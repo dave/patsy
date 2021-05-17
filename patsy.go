@@ -29,6 +29,15 @@ func Name(env vos.Env, packagePath string, srcDir string) (string, error) {
 		return "", errors.WithStack(err)
 	}
 
+	// go/build package relies on `os.Getenv` ... and this causes issues in go1.15
+	// so we have to set and unset GO111MODULE=off from our vos.Env
+	go111Mod := env.Getenv("GO111MODULE")
+	originalGo111Mod := os.Getenv("GO111MODULE")
+	if go111Mod != originalGo111Mod {
+		_ = os.Setenv("GO111MODULE", go111Mod)
+		defer func() { _ = os.Setenv("GO111MODULE", originalGo111Mod) }()
+	}
+
 	p, err := c.Import(packagePath, srcDir, 0)
 	if err != nil {
 		return "", errors.Wrapf(err, "importing %s", packagePath)

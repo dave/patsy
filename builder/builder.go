@@ -60,6 +60,12 @@ func NewGoRoot(env vos.Env, namespace string) (*Builder, error) {
 		return nil, errors.Wrap(err, "Error creating temporary namespace dir")
 	}
 
+	// from go1.16 onwards we need to explicitly turn go modules off in GOROOT mode
+	err = b.env.Setenv("GO111MODULE", "off")
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
 	err = b.env.Setenv("GOPATH", gopath+string(filepath.ListSeparator)+b.env.Getenv("GOPATH"))
 	if err != nil {
 		return nil, errors.WithStack(err)
